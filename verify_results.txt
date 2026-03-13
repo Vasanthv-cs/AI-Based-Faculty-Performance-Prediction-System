@@ -1,0 +1,4 @@
+PROFILES_COUNT: {"c":6}
+ROLES_COUNT: {"role":"admin","c":1} {"role":"faculty","c":5}
+TABLES: {"table_name":"announcements"} {"table_name":"appraisal_cycles"} {"table_name":"events_contributions"} {"table_name":"memberships_fdp"} {"table_name":"networking_contributions"} {"table_name":"patents_guidance"} {"table_name":"projects_consultancy"} {"table_name":"research_activities"} {"table_name":"teaching_learning_activities"}
+STORAGE: {"id":"faculty-files","name":"faculty-files","public":true}

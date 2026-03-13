@@ -1,0 +1,15 @@
+﻿STEP 1: OK
+STEP 2: ERROR: {"message":"Failed to run sql query: ERROR:  42P10: there is no unique or exclusion constraint matching the ON CONFLICT specification\n"}
+STEP 3: OK
+STEP 4: OK
+STEP 5: OK
+STEP 6: OK
+STEP 7: OK
+STEP 8: OK
+STEP 9: OK
+STEP 10: OK
+STEP 11: OK
+STEP 12: OK
+STEP 13: OK
+STEP 14: OK
+STEP 15: OK

@@ -1,0 +1,13 @@
+{
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/supabase/:path*",
+      "destination": "https://ygtlbwjerlhkxcgzezwr.supabase.co/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
