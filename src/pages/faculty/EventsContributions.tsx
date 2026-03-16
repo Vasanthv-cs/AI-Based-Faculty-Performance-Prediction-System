@@ -120,8 +120,7 @@ const EventsContributions: React.FC = () => {
                 contribution_level: formData.level,
                 role: JSON.stringify({ metadata: { date: formData.date, venue: formData.venue, link: formData.link } }),
                 score_claimed: calcEventScore(formData.type),
-                proof_url: documentUrl,
-                status: 'pending'
+                proof_url: documentUrl
             };
 
             if (editingItem) {

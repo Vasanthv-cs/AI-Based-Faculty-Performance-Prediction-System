@@ -117,8 +117,7 @@ const PatentsGuidance: React.FC = () => {
                 activity_level: formData.status,
                 role: JSON.stringify({ metadata: { ref_name: formData.name, link: formData.link } }),
                 score_claimed: calcPatentScore(formData.type),
-                proof_url: documentUrl,
-                status: 'pending'
+                proof_url: documentUrl
             };
 
             if (editingItem) {

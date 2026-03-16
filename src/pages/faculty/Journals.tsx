@@ -154,8 +154,7 @@ const Journals: React.FC = () => {
                     }
                 }),
                 score_claimed: calculateScore(formData.indexing),
-                proof_url: documentUrl,
-                status: 'pending'
+                proof_url: documentUrl
             };
 
             if (editingItem) {

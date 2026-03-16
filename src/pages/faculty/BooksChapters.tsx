@@ -132,8 +132,7 @@ const BooksChapters: React.FC = () => {
                     }
                 }),
                 score_claimed: calcBookScore(formData.type),
-                proof_url: documentUrl,
-                status: 'pending'
+                proof_url: documentUrl
             };
 
             if (editingItem) {

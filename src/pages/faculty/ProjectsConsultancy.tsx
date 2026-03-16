@@ -135,8 +135,7 @@ const ProjectsConsultancy: React.FC = () => {
                     }
                 }),
                 score_claimed: calcProjectScore(formData.type),
-                proof_url: fileUrl,
-                status: 'pending'
+                proof_url: fileUrl
             };
 
             if (editingItem) {

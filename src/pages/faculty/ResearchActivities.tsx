@@ -112,8 +112,7 @@ const ResearchActivities: React.FC = () => {
                 activity_level: formData.activity_level,
                 role: formData.role,
                 score_claimed: Number(formData.score_claimed),
-                proof_url: documentUrl,
-                status: 'pending'
+                proof_url: documentUrl
             };
 
             if (editingItem) {
