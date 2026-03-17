@@ -131,11 +131,10 @@
  
      setIsProcessing(true);
      try {
-       // Update the user's role to admin
+       // Upsert so it works even if user_roles row doesn't exist yet
        const { error } = await supabase
          .from('user_roles')
-         .update({ role: 'admin' })
-         .eq('user_id', selectedUser.user_id);
+         .upsert({ user_id: selectedUser.user_id, role: 'admin' }, { onConflict: 'user_id' });
  
        if (error) throw error;
  
@@ -144,7 +143,6 @@
          description: `${selectedUser.full_name} is now an Admin.`,
        });
  
-       // Refresh data
        fetchData();
      } catch (error) {
        console.error('Error adding admin:', error);
