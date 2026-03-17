@@ -1,3 +1,6 @@
+
+Project Live Link : https://ai-based-faculty-performance-predic.vercel.app/
+
 # 🎓 AI-Based Faculty Performance Prediction System
 
 🚀 An **AI-powered academic analytics platform** that digitizes and automates the faculty appraisal process.
