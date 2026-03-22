@@ -9,6 +9,7 @@ interface PerformanceScoreCardProps {
   breakdown: {
     label: string;
     score: number;
+    max: number;
     color: string;
   }[];
 }
@@ -23,7 +24,7 @@ const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
   const trendColor = trend === 'up' ? 'text-success' : trend === 'down' ? 'text-destructive' : 'text-muted-foreground';
   const maxScore = 250;
   const percentage = Math.max(0, Math.min(100, (score / maxScore) * 100));
-  
+
   const getCategoryColor = () => {
     if (percentage >= 85) return 'text-success';
     if (percentage >= 70) return 'text-primary';
@@ -44,7 +45,7 @@ const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
         <div className="w-1.5 h-6 bg-primary rounded-full" />
         <h3 className="font-display font-black text-xl tracking-tight">Performance Analytics</h3>
       </div>
-      
+
       {/* Main Score Circle with Gradient Shine */}
       <div className="flex justify-center mb-8 relative">
         <div className="absolute inset-0 bg-primary/5 rounded-full blur-[60px] animate-pulse-subtle -z-10" />
@@ -92,9 +93,9 @@ const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
         <div className={cn(
           'px-6 py-2.5 rounded-[20px] shadow-xl border border-white/10 backdrop-blur-md transition-all duration-500 hover:scale-105',
           percentage >= 85 ? 'bg-emerald-500/10 border-emerald-500/20' :
-          percentage >= 70 ? 'bg-indigo-500/10 border-indigo-500/20' :
-          percentage >= 50 ? 'bg-amber-500/10 border-amber-500/20' :
-          'bg-rose-500/10 border-rose-500/20'
+            percentage >= 70 ? 'bg-indigo-500/10 border-indigo-500/20' :
+              percentage >= 50 ? 'bg-amber-500/10 border-amber-500/20' :
+                'bg-rose-500/10 border-rose-500/20'
         )}>
           <span className={cn('text-sm font-black uppercase tracking-[0.2em]', getPercentageColor())}>
             Rank: {category}
@@ -105,26 +106,29 @@ const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
       {/* Score Breakdown with Premium Bars */}
       <div className="space-y-6">
         <div className="flex items-center gap-2 mb-2">
-           <div className="w-1 h-3 bg-muted rounded-full" />
-           <h4 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground/60">Component Scores</h4>
+          <div className="w-1 h-3 bg-muted rounded-full" />
+          <h4 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground/60">Component Scores</h4>
         </div>
         <div className="grid gap-5">
-          {breakdown.map((item, index) => (
-            <div key={index} className="space-y-2 group/bar">
-              <div className="flex justify-between items-end">
-                <span className="text-xs font-bold text-foreground/80 group-hover/bar:text-primary transition-colors">{item.label}</span>
-                <span className="text-xs font-black text-primary bg-primary/5 px-2 py-0.5 rounded-lg border border-primary/10 shadow-sm">{item.score}%</span>
-              </div>
-              <div className="h-2 bg-muted/40 rounded-full overflow-hidden p-[1px] relative">
-                <div
-                  className={cn('h-full rounded-full transition-all duration-1000 ease-out shadow-lg', item.color)}
-                  style={{ width: `${item.score}%` }}
-                >
-                   <div className="absolute inset-0 bg-white/20 animate-pulse-subtle" />
+          {breakdown.map((item, index) => {
+            const pct = item.max > 0 ? Math.min(100, Math.round((item.score / item.max) * 100)) : 0;
+            return (
+              <div key={index} className="space-y-2 group/bar">
+                <div className="flex justify-between items-end">
+                  <span className="text-xs font-bold text-foreground/80 group-hover/bar:text-primary transition-colors">{item.label}</span>
+                  <span className="text-xs font-black text-primary bg-primary/5 px-2 py-0.5 rounded-lg border border-primary/10 shadow-sm">{item.score}/{item.max}</span>
+                </div>
+                <div className="h-2 bg-muted/40 rounded-full overflow-hidden p-[1px] relative">
+                  <div
+                    className={cn('h-full rounded-full transition-all duration-1000 ease-out shadow-lg', item.color)}
+                    style={{ width: `${pct}%` }}
+                  >
+                    <div className="absolute inset-0 bg-white/20 animate-pulse-subtle" />
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

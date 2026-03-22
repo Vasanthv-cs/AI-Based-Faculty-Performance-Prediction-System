@@ -67,6 +67,59 @@ function buildPrintHTML(data: FacultyReportData): string {
             </div>
         </div>`;
 
+    // ── Cap helpers ──────────────────────────────────────────────────────────────
+    const RESEARCH_MAX = 100;
+    const NETWORK_MAX  = 100;
+
+    // Compute per-row metadata with running totals
+    let rRunning = 0;
+    const researchMeta = data.researchRecords.map((r: any) => {
+        const pts     = Number(r.score_claimed || 0);
+        const prev    = rRunning;
+        rRunning     += pts;
+        const counted = Math.max(0, Math.min(pts, RESEARCH_MAX - prev));
+        return { pts, counted, isExtra: counted < pts, isFullyExtra: counted === 0 };
+    });
+    const liveResearchScore = Math.min(rRunning, RESEARCH_MAX);
+
+    let nRunning = 0;
+    const networkMeta = data.networkingRecords.map((n: any) => {
+        const pts     = Number(n.score_claimed || 0);
+        const prev    = nRunning;
+        nRunning     += pts;
+        const counted = Math.max(0, Math.min(pts, NETWORK_MAX - prev));
+        return { pts, counted, isExtra: counted < pts, isFullyExtra: counted === 0 };
+    });
+    const liveNetworkScore = Math.min(nRunning, NETWORK_MAX);
+
+    // Use live-computed scores so the bars match the actual item list
+    const displayResearchScore      = liveResearchScore;
+    const displayContributionScore  = liveNetworkScore;
+    const displayTotal = data.teachingScore + displayResearchScore + displayContributionScore;
+
+    // Row builders for Research / Networking with cap indicators
+    const researchRows = data.researchRecords.map((r: any, i: number) => {
+        const { pts, counted, isFullyExtra, isExtra } = researchMeta[i];
+        const scoreCell = isFullyExtra
+            ? `<span style="text-decoration:line-through;color:#94a3b8">${pts} pts</span> <span style="margin-left:4px;background:#fef3c7;border:1px solid #fcd34d;color:#b45309;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700;">EXTRA — Not Counted</span>`
+            : isExtra
+            ? `<span style="color:#059669;font-weight:600">${counted} pts</span> <span style="margin-left:4px;background:#fef3c7;border:1px solid #fcd34d;color:#b45309;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700;">${pts - counted} pts excess</span>`
+            : `<span style="font-weight:600">${pts} pts</span>`;
+        const rowBg = isFullyExtra ? 'background:#f8fafc;opacity:0.7;' : isExtra ? 'background:#fffbeb;' : '';
+        return `<tr style="${rowBg}"><td style="padding:5px 10px;border:1px solid #e2e8f0;${isFullyExtra ? 'color:#94a3b8;text-decoration:line-through;' : ''}">${r.title || '—'}</td><td style="padding:5px 10px;border:1px solid #e2e8f0;${isFullyExtra ? 'color:#94a3b8;' : ''}">${r.activity_category || '—'}</td><td style="padding:5px 10px;border:1px solid #e2e8f0;${isFullyExtra ? 'color:#94a3b8;' : ''}">${r.academic_year || '—'}</td><td style="padding:5px 10px;border:1px solid #e2e8f0;">${scoreCell}</td></tr>`;
+    }).join('');
+
+    const networkRows = data.networkingRecords.map((n: any, i: number) => {
+        const { pts, counted, isFullyExtra, isExtra } = networkMeta[i];
+        const scoreCell = isFullyExtra
+            ? `<span style="text-decoration:line-through;color:#94a3b8">${pts} pts</span> <span style="margin-left:4px;background:#fef3c7;border:1px solid #fcd34d;color:#b45309;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700;">EXTRA — Not Counted</span>`
+            : isExtra
+            ? `<span style="color:#059669;font-weight:600">${counted} pts</span> <span style="margin-left:4px;background:#fef3c7;border:1px solid #fcd34d;color:#b45309;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700;">${pts - counted} pts excess</span>`
+            : `<span style="font-weight:600">${pts} pts</span>`;
+        const rowBg = isFullyExtra ? 'background:#f8fafc;opacity:0.7;' : isExtra ? 'background:#fffbeb;' : '';
+        return `<tr style="${rowBg}"><td style="padding:5px 10px;border:1px solid #e2e8f0;${isFullyExtra ? 'color:#94a3b8;text-decoration:line-through;' : ''}">${n.title || '—'}</td><td style="padding:5px 10px;border:1px solid #e2e8f0;${isFullyExtra ? 'color:#94a3b8;' : ''}">${n.contribution_category || '—'}</td><td style="padding:5px 10px;border:1px solid #e2e8f0;${isFullyExtra ? 'color:#94a3b8;' : ''}">${n.academic_year || '—'}</td><td style="padding:5px 10px;border:1px solid #e2e8f0;">${scoreCell}</td></tr>`;
+    }).join('');
+
     return `<!DOCTYPE html>
 <html>
 <head>
@@ -88,6 +141,7 @@ function buildPrintHTML(data: FacultyReportData): string {
         .total-box .score { font-size: 48px; font-weight: 900; color: #1e40af; }
         .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }
         .no-data { color: #94a3b8; font-style: italic; font-size: 12px; }
+        .cap-note { font-size: 11px; color: #b45309; font-style: italic; margin-bottom: 8px; }
     </style>
 </head>
 <body>
@@ -115,13 +169,13 @@ function buildPrintHTML(data: FacultyReportData): string {
         <div class="section-title">Performance Score Summary</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start">
             <div>
-                ${scoreBar('Teaching & Learning', data.teachingScore, 50, '#10b981')}
-                ${scoreBar('Research Activities', data.researchScore, 100, '#8b5cf6')}
-                ${scoreBar('Contributions',       data.contributionScore, 100, '#3b82f6')}
+                ${scoreBar('Teaching &amp; Learning', data.teachingScore, 50, '#10b981')}
+                ${scoreBar('Research Activities', displayResearchScore, 100, '#8b5cf6')}
+                ${scoreBar('Contributions',       displayContributionScore, 100, '#3b82f6')}
             </div>
             <div class="total-box">
                 <div style="font-size:13px;color:#64748b;margin-bottom:6px">Total Score</div>
-                <div class="score">${data.totalScore}</div>
+                <div class="score">${displayTotal}</div>
                 <div style="font-size:13px;color:#64748b">out of 250</div>
                 <div style="margin-top:8px"><span class="badge" style="background:${gradeColor}">${data.category}</span></div>
             </div>
@@ -130,34 +184,36 @@ function buildPrintHTML(data: FacultyReportData): string {
 
     <!-- Teaching Records -->
     <div class="section">
-        <div class="section-title">Teaching & Learning (Max 50 pts)</div>
+        <div class="section-title">Teaching &amp; Learning (Max 50 pts)</div>
         ${data.teachingRecords.length === 0
             ? '<p class="no-data">No teaching records found.</p>'
             : `<table>
                 <tr style="background:#dbeafe"><th style="padding:6px 10px;border:1px solid #e2e8f0;text-align:left">Academic Year</th><th style="padding:6px 10px;border:1px solid #e2e8f0;text-align:left">Semester</th><th style="padding:6px 10px;border:1px solid #e2e8f0;text-align:left">Pass %</th><th style="padding:6px 10px;border:1px solid #e2e8f0;text-align:left">Feedback %</th><th style="padding:6px 10px;border:1px solid #e2e8f0;text-align:left">Instruction Level</th></tr>
-                ${data.teachingRecords.map(t => `<tr><td style="padding:5px 10px;border:1px solid #e2e8f0">${t.academic_year}</td><td style="padding:5px 10px;border:1px solid #e2e8f0">${t.semester}</td><td style="padding:5px 10px;border:1px solid #e2e8f0">${t.subject_pass_percentage}%</td><td style="padding:5px 10px;border:1px solid #e2e8f0">${t.student_feedback_percentage}%</td><td style="padding:5px 10px;border:1px solid #e2e8f0">${t.instruction_material_level}</td></tr>`).join('')}
+                ${data.teachingRecords.map((t: any) => `<tr><td style="padding:5px 10px;border:1px solid #e2e8f0">${t.academic_year}</td><td style="padding:5px 10px;border:1px solid #e2e8f0">${t.semester}</td><td style="padding:5px 10px;border:1px solid #e2e8f0">${t.subject_pass_percentage}%</td><td style="padding:5px 10px;border:1px solid #e2e8f0">${t.student_feedback_percentage}%</td><td style="padding:5px 10px;border:1px solid #e2e8f0">${t.instruction_material_level}</td></tr>`).join('')}
                </table>`}
     </div>
 
     <!-- Research Records -->
     <div class="section">
-        <div class="section-title">Research Activities (Max 100 pts)</div>
+        <div class="section-title">Research Activities (Max 100 pts — Counted: ${displayResearchScore} pts)</div>
+        ${rRunning > RESEARCH_MAX ? `<p class="cap-note">⚠ Total claimed: ${rRunning} pts. Only the first ${RESEARCH_MAX} pts are counted. Rows marked "EXTRA" are excluded from scoring.</p>` : ''}
         ${data.researchRecords.length === 0
             ? '<p class="no-data">No research records found.</p>'
             : `<table>
                 <tr style="background:#ede9fe"><th style="padding:6px 10px;border:1px solid #e2e8f0;text-align:left">Title</th><th style="padding:6px 10px;border:1px solid #e2e8f0;text-align:left">Category</th><th style="padding:6px 10px;border:1px solid #e2e8f0;text-align:left">Year</th><th style="padding:6px 10px;border:1px solid #e2e8f0;text-align:left">Score</th></tr>
-                ${data.researchRecords.map(r => `<tr><td style="padding:5px 10px;border:1px solid #e2e8f0">${r.title || '—'}</td><td style="padding:5px 10px;border:1px solid #e2e8f0">${r.activity_category || '—'}</td><td style="padding:5px 10px;border:1px solid #e2e8f0">${r.academic_year || '—'}</td><td style="padding:5px 10px;border:1px solid #e2e8f0">${r.score_claimed ?? '—'} pts</td></tr>`).join('')}
+                ${researchRows}
                </table>`}
     </div>
 
     <!-- Networking & Contributions -->
     <div class="section">
-        <div class="section-title">Networking & Contributions (Max 100 pts)</div>
+        <div class="section-title">Networking &amp; Contributions (Max 100 pts — Counted: ${displayContributionScore} pts)</div>
+        ${nRunning > NETWORK_MAX ? `<p class="cap-note">⚠ Total claimed: ${nRunning} pts. Only the first ${NETWORK_MAX} pts are counted. Rows marked "EXTRA" are excluded from scoring.</p>` : ''}
         ${data.networkingRecords.length === 0
             ? '<p class="no-data">No contribution records found.</p>'
             : `<table>
                 <tr style="background:#dcfce7"><th style="padding:6px 10px;border:1px solid #e2e8f0;text-align:left">Title</th><th style="padding:6px 10px;border:1px solid #e2e8f0;text-align:left">Category</th><th style="padding:6px 10px;border:1px solid #e2e8f0;text-align:left">Year</th><th style="padding:6px 10px;border:1px solid #e2e8f0;text-align:left">Score</th></tr>
-                ${data.networkingRecords.map(r => `<tr><td style="padding:5px 10px;border:1px solid #e2e8f0">${r.title || '—'}</td><td style="padding:5px 10px;border:1px solid #e2e8f0">${r.contribution_category || '—'}</td><td style="padding:5px 10px;border:1px solid #e2e8f0">${r.academic_year || '—'}</td><td style="padding:5px 10px;border:1px solid #e2e8f0">${r.score_claimed ?? '—'} pts</td></tr>`).join('')}
+                ${networkRows}
                </table>`}
     </div>
 

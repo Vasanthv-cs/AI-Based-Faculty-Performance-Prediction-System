@@ -24,11 +24,13 @@ import FileUpload from '@/components/FileUpload';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Award, Pencil, Trash2, Loader2, Link as LinkIcon, Lock } from 'lucide-react';
+import { Plus, Award, Pencil, Trash2, Loader2, Link as LinkIcon, Lock, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import FileViewer from '@/components/FileViewer';
 import { useActiveCycle } from '@/hooks/useActiveCycle';
 import CycleLockBanner from '@/components/dashboard/CycleLockBanner';
 import { Badge } from '@/components/ui/badge';
+
+const CAT3_MAX = 100; // Category III max points
 
 const NetworkingContributions: React.FC = () => {
     const { user } = useAuth();
@@ -283,6 +285,55 @@ const NetworkingContributions: React.FC = () => {
                 </div>
             )}
 
+            {/* Score Cap Summary Banner */}
+            {!isLoading && (() => {
+                const rawTotal = records.reduce((sum: number, r: any) => sum + Number(r.score_claimed || 0), 0);
+                const cappedTotal = Math.min(rawTotal, CAT3_MAX);
+                const pct = Math.min(100, Math.round((cappedTotal / CAT3_MAX) * 100));
+                const isOverLimit = rawTotal > CAT3_MAX;
+                return (
+                    <div className={`mb-6 rounded-2xl border-2 p-5 flex items-center justify-between gap-4 animate-reveal ${
+                        isOverLimit
+                            ? 'bg-orange-50 border-orange-200'
+                            : 'bg-emerald-50 border-emerald-200'
+                    }`}>
+                        <div className="flex items-center gap-3">
+                            {isOverLimit
+                                ? <AlertTriangle className="w-5 h-5 text-orange-500 shrink-0" />
+                                : <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />}
+                            <div>
+                                <div className={`text-xs font-black uppercase tracking-widest mb-0.5 ${
+                                    isOverLimit ? 'text-orange-700' : 'text-emerald-700'
+                                }`}>Networking & Contributions — Category III (Max {CAT3_MAX} pts)</div>
+                                <div className="flex items-baseline gap-2">
+                                    <span className={`text-2xl font-black ${
+                                        isOverLimit ? 'text-orange-600' : 'text-emerald-600'
+                                    }`}>{cappedTotal}/{CAT3_MAX}</span>
+                                    {isOverLimit && (
+                                        <span className="text-xs font-bold text-orange-500">
+                                            ({rawTotal} pts claimed — {rawTotal - CAT3_MAX} excess pts will not be counted)
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex-1 max-w-48">
+                            <div className="h-2 bg-white/60 rounded-full overflow-hidden border border-white/80">
+                                <div
+                                    className={`h-full rounded-full transition-all duration-700 ${
+                                        isOverLimit ? 'bg-orange-400' : 'bg-emerald-400'
+                                    }`}
+                                    style={{ width: `${pct}%` }}
+                                />
+                            </div>
+                            <div className={`text-[9px] font-black uppercase tracking-widest mt-1 text-right ${
+                                isOverLimit ? 'text-orange-400' : 'text-emerald-400'
+                            }`}>{pct}% of max</div>
+                        </div>
+                    </div>
+                );
+            })()}
+
             <div className="premium-card overflow-hidden animate-reveal delay-200">
                 {isLoading ? (
                     <div className="flex flex-col items-center justify-center p-24 gap-4">
@@ -300,7 +351,48 @@ const NetworkingContributions: React.FC = () => {
                             Initiate First Connection
                         </Button>
                     </div>
-                ) : (
+                ) : (() => {
+                    // Category Hard Caps
+                    const CAPS: Record<string, number> = {
+                        'Professional Society': 20,
+                        'FDP Attended': 25,
+                        'Organized Event': 25,
+                        'Consultancy': 15,
+                        'Funded Project': 25,
+                        'Institution Contribution': 30
+                    };
+
+                    // Compute which rows are within sub-caps
+                    const categoryTracking: Record<string, number> = {};
+                    let totalCappedScore = 0;
+
+                    const rowMeta = records.map((item: any) => {
+                        const cat = item.contribution_category || 'Other';
+                        const pts = Number(item.score_claimed || 0);
+                        const cap = CAPS[cat] || 999;
+                        
+                        const currentCatTotal = categoryTracking[cat] || 0;
+                        const countedTowardsCat = Math.max(0, Math.min(pts, cap - currentCatTotal));
+                        
+                        // Also respect the overall 100-pt cap for Category III
+                        const countedFinal = Math.max(0, Math.min(countedTowardsCat, 100 - totalCappedScore));
+                        
+                        categoryTracking[cat] = currentCatTotal + pts;
+                        totalCappedScore += countedFinal;
+
+                        const isSubCapExtra = countedTowardsCat < pts;
+                        const isTotalCapExtra = countedTowardsCat > 0 && countedFinal < countedTowardsCat;
+                        const isFullyExtra = countedFinal === 0;
+
+                        return { 
+                            counted: countedFinal, 
+                            isExtra: isSubCapExtra || isTotalCapExtra, 
+                            isFullyExtra,
+                            isSubCapHit: isSubCapExtra
+                        };
+                    });
+
+                    return (
                     <Table>
                         <TableHeader>
                             <TableRow className="bg-muted/30 hover:bg-muted/30 border-none">
@@ -311,28 +403,73 @@ const NetworkingContributions: React.FC = () => {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {records.map((item, idx) => (
-                                <TableRow key={item.id} className="group hover:bg-muted/10 transition-colors border-border/50 animate-reveal" style={{ animationDelay: `${idx * 50}ms` }}>
+                            {records.map((item: any, idx: number) => {
+                                const { counted, isExtra, isFullyExtra, isSubCapHit } = rowMeta[idx];
+                                const catCap = CAPS[item.contribution_category] || 'N/A';
+                                
+                                return (
+                                <TableRow
+                                    key={item.id}
+                                    className={`group transition-colors border-border/50 animate-reveal ${
+                                        isFullyExtra
+                                            ? 'bg-slate-50/70 hover:bg-slate-100/60 opacity-70'
+                                            : isExtra
+                                            ? 'bg-amber-50/40 hover:bg-amber-50/60'
+                                            : 'hover:bg-muted/10'
+                                    }`}
+                                    style={{ animationDelay: `${idx * 50}ms` }}
+                                >
                                     <TableCell className="pl-8 py-5">
-                                        <Badge variant="outline" className="h-7 px-3 rounded-lg border-primary/20 bg-primary/5 text-primary font-black text-[10px] tracking-tight whitespace-nowrap">
+                                        <Badge variant="outline" className={`h-7 px-3 rounded-lg font-black text-[10px] tracking-tight whitespace-nowrap ${
+                                            isFullyExtra
+                                                ? 'border-slate-300/40 bg-slate-100 text-slate-400'
+                                                : 'border-primary/20 bg-primary/5 text-primary'
+                                        }`}>
                                             {item.academic_year}
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="py-5">
                                         <div className="flex flex-col gap-1.5">
-                                            <div className="font-bold text-foreground text-sm tracking-tight leading-snug group-hover:text-primary transition-colors max-w-[400px]">{item.title}</div>
-                                            <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">{item.contribution_category}</div>
+                                            <div className={`font-bold text-sm tracking-tight leading-snug max-w-[400px] ${
+                                                isFullyExtra
+                                                    ? 'text-slate-400 line-through decoration-slate-300'
+                                                    : 'text-foreground group-hover:text-primary transition-colors'
+                                            }`}>{item.title}</div>
+                                            <div className={`text-[10px] font-black uppercase tracking-widest ${
+                                                isFullyExtra ? 'text-slate-400/50' : 'text-muted-foreground/60'
+                                            }`}>{item.contribution_category} (Max {catCap})</div>
                                         </div>
                                     </TableCell>
                                     <TableCell className="py-5">
-                                        <div className="flex flex-col gap-1 text-xs">
-                                            <div className="font-bold text-muted-foreground/80 flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-secondary/60" />
-                                                {item.role} <span className="text-muted-foreground/40 opacity-40">|</span> {item.contribution_level}
+                                        <div className="flex flex-col gap-1.5 text-xs">
+                                            <div className={`font-bold flex items-center gap-1.5 text-[10px] uppercase tracking-wider ${
+                                                isFullyExtra ? 'text-slate-400/60' : 'text-muted-foreground/80'
+                                            }`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full ${
+                                                    isFullyExtra ? 'bg-slate-300' : 'bg-secondary/60'
+                                                }`} />
+                                                {item.role} <span className="opacity-40">|</span> {item.contribution_level}
                                             </div>
-                                            <div className="text-[10px] font-black uppercase tracking-tight text-secondary">
-                                                Performance: {item.score_claimed} PTS
-                                            </div>
+                                            {isFullyExtra ? (
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] font-black uppercase tracking-tight text-slate-400 line-through">{item.score_claimed} PTS</span>
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-100 border border-amber-300 text-amber-700 text-[9px] font-black uppercase tracking-wider">⚠ Extra • Not Counted</span>
+                                                </div>
+                                            ) : isExtra ? (
+                                                <div className="flex flex-col gap-0.5">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] font-black uppercase tracking-tight text-secondary">Counted: {counted} PTS</span>
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-100 border border-amber-300 text-amber-700 text-[9px] font-black uppercase tracking-wider">
+                                                           {isSubCapHit ? '⚠ Type Cap Exceeded' : '⚠ Category Maxed'}
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-[9px] text-slate-400 font-medium">(Claimed {item.score_claimed} pts — {item.score_claimed - counted} excess not counted)</span>
+                                                </div>
+                                            ) : (
+                                                <div className="text-[10px] font-black uppercase tracking-tight text-secondary">
+                                                    Performance: {item.score_claimed} PTS
+                                                </div>
+                                            )}
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-right pr-8 py-5">
@@ -346,10 +483,11 @@ const NetworkingContributions: React.FC = () => {
                                         </div>
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                            )})}
                         </TableBody>
                     </Table>
-                )}
+                    );
+                })()}
             </div>
         </DashboardLayout>
     );

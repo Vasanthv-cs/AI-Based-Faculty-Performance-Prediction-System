@@ -249,32 +249,46 @@ const FacultyDetailModal: React.FC<FacultyDetailModalProps> = ({
               </Card>
             )}
 
-            {/* Performance Breakdown */}
-            {performance && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Point Distribution (250 Scale)</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {[
-                    { label: 'Teaching & Learning (Max 50)', score: performance.teaching_score, max: 50, icon: GraduationCap },
-                    { label: 'Research (Max 100)', score: performance.research_score, max: 100, icon: FileText },
-                    { label: 'Networking & Contributions (Max 100)', score: performance.contribution_score, max: 100, icon: Award }
-                  ].map((item) => (
-                    <div key={item.label} className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <item.icon className="w-4 h-4 text-muted-foreground" />
-                          <span>{item.label}</span>
+            {/* Performance Breakdown — scores computed live from item lists with cap applied */}
+            {performance && (() => {
+              // Compute capped Research score from fetched items
+              let rTotal = 0;
+              for (const r of researchList) rTotal += Number(r.score_claimed || 0);
+              const liveResearch = Math.min(rTotal, 100);
+
+              // Compute capped Networking score from fetched items
+              let nTotal = 0;
+              for (const n of networkingList) nTotal += Number(n.score_claimed || 0);
+              const liveNetwork = Math.min(nTotal, 100);
+
+              const items = [
+                { label: 'Teaching & Learning (Max 50)', score: Number(performance.teaching_score || 0), max: 50, icon: GraduationCap },
+                { label: 'Research (Max 100)',            score: liveResearch,                             max: 100, icon: FileText },
+                { label: 'Networking & Contributions (Max 100)', score: liveNetwork,                      max: 100, icon: Award },
+              ];
+
+              return (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Point Distribution (250 Scale)</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {items.map((item) => (
+                      <div key={item.label} className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-2">
+                            <item.icon className="w-4 h-4 text-muted-foreground" />
+                            <span>{item.label}</span>
+                          </div>
+                          <span className="font-medium">{item.score.toFixed(0)} / {item.max}</span>
                         </div>
-                        <span className="font-medium">{Number(item.score || 0).toFixed(0)} / {item.max}</span>
+                        <Progress value={(item.score / item.max) * 100} className="h-2" />
                       </div>
-                      <Progress value={(Number(item.score || 0) / item.max) * 100} className="h-2" />
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
+                    ))}
+                  </CardContent>
+                </Card>
+              );
+            })()}
 
             {/* AI Insights */}
             {insights.length > 0 && (
@@ -341,20 +355,50 @@ const FacultyDetailModal: React.FC<FacultyDetailModalProps> = ({
                 <div className="space-y-2">
                   {researchList.length === 0 ? (
                     <p className="text-muted-foreground text-center py-4">No research records found</p>
-                  ) : (
-                    researchList.map((r) => (
-                      <div key={r.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                        <div className="flex-1 min-w-0 pr-4">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold uppercase text-primary">{r.activity_category}</span>
-                            <span className="font-medium truncate">{r.title}</span>
+                  ) : (() => {
+                    const RESEARCH_MAX = 100;
+                    let rRunning = 0;
+                    return researchList.map((r) => {
+                      const pts = Number(r.score_claimed || 0);
+                      const prev = rRunning;
+                      rRunning += pts;
+                      const counted = Math.max(0, Math.min(pts, RESEARCH_MAX - prev));
+                      const isFullyExtra = counted === 0;
+                      const isPartialExtra = counted < pts && counted > 0;
+                      return (
+                        <div key={r.id} className={`flex items-center justify-between p-3 rounded-lg ${
+                          isFullyExtra ? 'bg-slate-50 opacity-70' : isPartialExtra ? 'bg-amber-50/60' : 'bg-muted/50'
+                        }`}>
+                          <div className="flex-1 min-w-0 pr-4">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`text-xs font-bold uppercase ${
+                                isFullyExtra ? 'text-slate-400' : 'text-primary'
+                              }`}>{r.activity_category}</span>
+                              <span className={`font-medium truncate ${
+                                isFullyExtra ? 'text-slate-400 line-through decoration-slate-300' : ''
+                              }`}>{r.title}</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">Level: {r.activity_level} | Year: {r.academic_year}</p>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-1">Level: {r.activity_level} | Year: {r.academic_year}</p>
+                          <div className="flex flex-col items-end gap-1 shrink-0">
+                            {isFullyExtra ? (
+                              <>
+                                <Badge variant="outline" className="text-slate-400 border-slate-200 line-through">{r.score_claimed} Pts</Badge>
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-100 border border-amber-300 text-amber-700 text-[9px] font-black uppercase tracking-wide">⚠ Extra</span>
+                              </>
+                            ) : isPartialExtra ? (
+                              <>
+                                <Badge variant="outline" className="text-emerald-700 border-emerald-200">+{counted} Pts counted</Badge>
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-100 border border-amber-300 text-amber-700 text-[9px] font-black uppercase tracking-wide">⚠ {pts - counted} excess</span>
+                              </>
+                            ) : (
+                              <Badge variant="outline">+{r.score_claimed} Pts</Badge>
+                            )}
+                          </div>
                         </div>
-                        <Badge variant="outline">+{r.score_claimed} Pts</Badge>
-                      </div>
-                    ))
-                  )}
+                      );
+                    });
+                  })()}
                 </div>
               </TabsContent>
 
@@ -362,20 +406,72 @@ const FacultyDetailModal: React.FC<FacultyDetailModalProps> = ({
                 <div className="space-y-2">
                   {networkingList.length === 0 ? (
                     <p className="text-muted-foreground text-center py-4">No contribution records found</p>
-                  ) : (
-                    networkingList.map((c) => (
-                      <div key={c.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                        <div className="flex-1 min-w-0 pr-4">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold uppercase text-primary">{c.contribution_category}</span>
-                            <span className="font-medium truncate">{c.title}</span>
+                  ) : (() => {
+                    const NET_MAX = 100;
+                    const CAPS: Record<string, number> = {
+                        'Professional Society': 20,
+                        'FDP Attended': 25,
+                        'Organized Event': 25,
+                        'Consultancy': 15,
+                        'Funded Project': 25,
+                        'Institution Contribution': 30
+                    };
+                    
+                    const catTrack: Record<string, number> = {};
+                    let totalCapped = 0;
+
+                    return networkingList.map((c) => {
+                      const cat = c.contribution_category || 'Other';
+                      const pts = Number(c.score_claimed || 0);
+                      const cap = CAPS[cat] || 999;
+                      
+                      const prevCatTotal = catTrack[cat] || 0;
+                      const allowedInCat = Math.max(0, Math.min(pts, cap - prevCatTotal));
+                      const counted = Math.max(0, Math.min(allowedInCat, NET_MAX - totalCapped));
+                      
+                      catTrack[cat] = prevCatTotal + pts;
+                      totalCapped += counted;
+
+                      const isFullyExtra = counted === 0;
+                      const isSubCapExtra = allowedInCat < pts;
+                      const isPartialExtra = !isFullyExtra && (isSubCapExtra || (counted < allowedInCat));
+
+                      return (
+                        <div key={c.id} className={`flex items-center justify-between p-3 rounded-lg ${
+                          isFullyExtra ? 'bg-slate-50 opacity-70' : isPartialExtra ? 'bg-amber-50/60' : 'bg-muted/50'
+                        }`}>
+                          <div className="flex-1 min-w-0 pr-4">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`text-xs font-bold uppercase ${
+                                isFullyExtra ? 'text-slate-400' : 'text-primary'
+                              }`}>{c.contribution_category}</span>
+                              <span className={`font-medium truncate ${
+                                isFullyExtra ? 'text-slate-400 line-through decoration-slate-300' : ''
+                              }`}>{c.title}</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">Level: {c.contribution_level} | Year: {c.academic_year}</p>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-1">Level: {c.contribution_level} | Year: {c.academic_year}</p>
+                          <div className="flex flex-col items-end gap-1 shrink-0">
+                            {isFullyExtra ? (
+                              <>
+                                <Badge variant="outline" className="text-slate-400 border-slate-200 line-through">{c.score_claimed} Pts</Badge>
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-100 border border-amber-300 text-amber-700 text-[9px] font-black uppercase tracking-wide">⚠ Extra</span>
+                              </>
+                            ) : isPartialExtra ? (
+                              <>
+                                <Badge variant="outline" className="text-emerald-700 border-emerald-200">+{counted} Pts counted</Badge>
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-100 border border-amber-300 text-amber-700 text-[9px] font-black uppercase tracking-wide">
+                                  {isSubCapExtra ? '⚠ Type Cap' : '⚠ Maxed'}
+                                </span>
+                              </>
+                            ) : (
+                              <Badge variant="outline">+{c.score_claimed} Pts</Badge>
+                            )}
+                          </div>
                         </div>
-                        <Badge variant="outline">+{c.score_claimed} Pts</Badge>
-                      </div>
-                    ))
-                  )}
+                      );
+                    });
+                  })()}
                 </div>
               </TabsContent>
             </Tabs>
