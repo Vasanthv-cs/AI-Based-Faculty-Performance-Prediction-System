@@ -20,10 +20,10 @@ const ACTIVITY_OPTIONS: ActivityOption[] = [
   { id: 'conference', label: '+ Conference Paper', category: 'research', basePoints: 10, cap: 100, description: 'Peer-reviewed conference' },
   { id: 'patent', label: '+ Patent Filed', category: 'research', basePoints: 5, cap: 100, description: 'Patent application or grant' },
   { id: 'book', label: '+ Book Authored', category: 'research', basePoints: 5, cap: 100, description: 'Authored academic book' },
-  { id: 'funded_project', label: '+ Funded Project', category: 'networking', basePoints: 25, cap: 100, description: 'Gov/Industry sponsored project' },
+  { id: 'funded_project', label: '+ Funded Project', category: 'research', basePoints: 25, cap: 100, description: 'Gov/Industry sponsored project' },
   { id: 'fdp_excellent', label: '+ FDP (Excellent)', category: 'networking', basePoints: 25, cap: 100, description: 'Faculty development program' },
   { id: 'institution', label: '+ Institution Work', category: 'networking', basePoints: 30, cap: 100, description: 'Key institutional contribution' },
-  { id: 'consultancy', label: '+ Consultancy', category: 'networking', basePoints: 10, cap: 100, description: 'Industry consulting work' },
+  { id: 'consultancy', label: '+ Consultancy', category: 'research', basePoints: 10, cap: 100, description: 'Industry consulting work' },
 ];
 
 const CATEGORY_CAPS = { research: 100, networking: 100, teaching: 50 };

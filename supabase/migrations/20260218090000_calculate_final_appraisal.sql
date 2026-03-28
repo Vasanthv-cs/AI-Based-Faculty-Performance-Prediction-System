@@ -49,7 +49,7 @@ declare
   v_total_raw int := 0;
   v_total_capped int := 0;
   v_percentage numeric := 0;
-  v_final_grade text := 'Poor';
+  v_final_grade text := 'Needs Improvement';
 begin
   /*
     Faculty Appraisal Scoring
@@ -136,7 +136,7 @@ begin
   elsif v_total_capped between 125 and 174 then
     v_final_grade := 'Good';
   else
-    v_final_grade := 'Poor';
+    v_final_grade := 'Needs Improvement';
   end if;
 
   -- Return a single-row result set as required by Supabase RPC.

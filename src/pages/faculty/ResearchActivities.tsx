@@ -301,6 +301,34 @@ const ResearchActivities: React.FC = () => {
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
+                        {/* Per-category caps: Journal=25, Conference=10, BookChapter=10, Book=5, Patent=5, Guidance=10, Total=100 */}
+                        {(() => {
+                            const CAPS: Record<string, number> = {
+                                'Journal': 25, 'Conference': 10, 'Book Chapter': 10,
+                                'Book': 5, 'Patent': 5, 'Guidance': 10
+                            };
+                            const TOTAL_MAX = 100;
+                            const catTrack: Record<string, number> = {};
+                            let totalCapped = 0;
+
+                            const meta = records.map((item: any) => {
+                                const cat = item.activity_category || 'Other';
+                                const pts = Number(item.score_claimed || 0);
+                                const cap = CAPS[cat] ?? 999;
+                                const prevCat = catTrack[cat] || 0;
+                                const allowedInCat = Math.max(0, Math.min(pts, cap - prevCat));
+                                const counted = Math.max(0, Math.min(allowedInCat, TOTAL_MAX - totalCapped));
+                                catTrack[cat] = prevCat + pts;
+                                totalCapped += counted;
+                                return {
+                                    counted, cap,
+                                    isFullyExtra: counted === 0,
+                                    isSubCapExtra: allowedInCat < pts,
+                                    isPartialExtra: counted > 0 && (allowedInCat < pts || counted < allowedInCat),
+                                };
+                            });
+
+                            return (
                         <Table>
                             <TableHeader>
                                 <TableRow className="bg-slate-900/5 hover:bg-slate-900/5 border-none">
@@ -311,26 +339,57 @@ const ResearchActivities: React.FC = () => {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {records.map((item, idx) => (
-                                    <TableRow key={item.id} className="group hover:bg-indigo-500/[0.02] transition-colors border-border/40 animate-reveal" style={{ animationDelay: `${idx * 80}ms` }}>
+                                {records.map((item: any, idx: number) => {
+                                    const { counted, cap, isFullyExtra, isSubCapExtra, isPartialExtra } = meta[idx];
+                                    return (
+                                    <TableRow key={item.id} className={`group transition-colors border-border/40 animate-reveal ${
+                                        isFullyExtra ? 'bg-slate-50/80 opacity-70' : isPartialExtra ? 'bg-amber-50/30' : 'hover:bg-indigo-500/[0.02]'
+                                    }`} style={{ animationDelay: `${idx * 80}ms` }}>
                                         <TableCell className="pl-10 py-8">
                                             <div className="flex flex-col gap-3">
                                                 <div className="flex items-center gap-2">
-                                                    <Badge variant="outline" className="text-[9px] h-6 px-3 rounded-full font-black uppercase tracking-widest border-none bg-indigo-600 text-white shadow-lg group-hover:scale-110 transition-transform origin-left">
-                                                        {item.activity_category}
+                                                    <Badge variant="outline" className={`text-[9px] h-6 px-3 rounded-full font-black uppercase tracking-widest border-none shadow-lg group-hover:scale-110 transition-transform origin-left ${
+                                                        isFullyExtra ? 'bg-slate-300 text-slate-500' : 'bg-indigo-600 text-white'
+                                                    }`}>
+                                                        {item.activity_category} (Max {cap < 999 ? cap : '–'})
                                                     </Badge>
                                                     <Badge variant="secondary" className="text-[9px] h-6 px-3 rounded-full font-black uppercase tracking-widest bg-muted text-muted-foreground/60 border-none">{item.academic_year}</Badge>
                                                 </div>
-                                                <div className="font-black text-slate-900 text-lg tracking-tight leading-snug group-hover:text-indigo-600 transition-colors max-w-sm">{item.title}</div>
+                                                <div className={`font-black text-lg tracking-tight leading-snug group-hover:text-indigo-600 transition-colors max-w-sm ${
+                                                    isFullyExtra ? 'text-slate-400 line-through decoration-slate-300' : 'text-slate-900'
+                                                }`}>{item.title}</div>
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-center py-8">
                                             <div className="relative inline-flex flex-col items-center group/score">
-                                                 <div className="absolute inset-0 bg-indigo-500/10 rounded-3xl blur-xl opacity-0 group-hover/score:opacity-100 transition-opacity duration-500" />
-                                                <div className="relative z-10 p-5 rounded-3xl bg-background border-2 border-indigo-500/5 flex flex-col items-center justify-center shadow-xl group-hover/score:border-indigo-500/20 group-hover/score:-translate-y-1 transition-all duration-500 min-w-[80px]">
-                                                    <div className="text-2xl font-black text-secondary leading-none">{item.score_claimed}</div>
-                                                    <div className="text-[8px] font-black uppercase tracking-widest text-muted-foreground/40 mt-1">Impact</div>
+                                                <div className="absolute inset-0 bg-indigo-500/10 rounded-3xl blur-xl opacity-0 group-hover/score:opacity-100 transition-opacity duration-500" />
+                                                <div className={`relative z-10 p-5 rounded-3xl border-2 flex flex-col items-center justify-center shadow-xl transition-all duration-500 min-w-[80px] ${
+                                                    isFullyExtra
+                                                        ? 'bg-slate-50 border-slate-200'
+                                                        : 'bg-background border-indigo-500/5 group-hover/score:border-indigo-500/20 group-hover/score:-translate-y-1'
+                                                }`}>
+                                                    {isFullyExtra ? (
+                                                        <>
+                                                            <div className="text-2xl font-black text-slate-300 line-through leading-none">{item.score_claimed}</div>
+                                                            <div className="text-[8px] font-black uppercase tracking-widest text-amber-500 mt-1">Extra</div>
+                                                        </>
+                                                    ) : isPartialExtra ? (
+                                                        <>
+                                                            <div className="text-2xl font-black text-secondary leading-none">{counted}</div>
+                                                            <div className="text-[8px] font-black uppercase tracking-widest text-amber-500 mt-1">of {item.score_claimed}</div>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <div className="text-2xl font-black text-secondary leading-none">{item.score_claimed}</div>
+                                                            <div className="text-[8px] font-black uppercase tracking-widest text-muted-foreground/40 mt-1">Impact</div>
+                                                        </>
+                                                    )}
                                                 </div>
+                                                {(isFullyExtra || isPartialExtra) && (
+                                                    <span className="mt-1.5 inline-flex items-center px-2 py-0.5 rounded-md bg-amber-100 border border-amber-300 text-amber-700 text-[8px] font-black uppercase tracking-wider">
+                                                        {isFullyExtra ? '⚠ Not Counted' : (isSubCapExtra ? '⚠ Type Cap' : '⚠ Total Cap')}
+                                                    </span>
+                                                )}
                                             </div>
                                         </TableCell>
                                         <TableCell className="py-8">
@@ -359,9 +418,12 @@ const ResearchActivities: React.FC = () => {
                                             </div>
                                         </TableCell>
                                     </TableRow>
-                                ))}
+                                    );
+                                })}
                             </TableBody>
                         </Table>
+                            );
+                        })()}
                     </div>
                 )}
             </div>

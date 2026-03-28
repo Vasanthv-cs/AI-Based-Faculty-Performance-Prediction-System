@@ -49,7 +49,7 @@ declare
   v_total_raw int := 0;
   v_total_capped int := 0;
   v_percentage numeric := 0;
-  v_final_grade text := 'Poor';
+  v_final_grade text := 'Needs Improvement';
 begin
   select
     coalesce(subject_pass_percentage, 0) + coalesce(student_feedback, 0) + coalesce(reading_material, 0) + coalesce(teaching_pedagogy, 0) + coalesce(slow_advanced_learners, 0) + coalesce(industrial_visits, 0),
@@ -64,7 +64,7 @@ begin
   v_total_raw := v_category1_total + v_category2_total + v_category3_total;
   v_total_capped := least(v_total_raw, 250);
   v_percentage := case when v_total_capped > 0 then round((v_total_capped::numeric / 250::numeric) * 100::numeric, 2) else 0 end;
-  v_final_grade := case when v_total_capped between 200 and 250 then 'Excellent' when v_total_capped between 175 and 199 then 'Very Good' when v_total_capped between 125 and 174 then 'Good' else 'Poor' end;
+  v_final_grade := case when v_total_capped between 200 and 250 then 'Excellent' when v_total_capped between 175 and 199 then 'Very Good' when v_total_capped between 125 and 174 then 'Good' else 'Needs Improvement' end;
 
   return query select v_category1_total, v_category2_total, v_category3_total, v_total_capped, v_percentage, v_final_grade;
 end;

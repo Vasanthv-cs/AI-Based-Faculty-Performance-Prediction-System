@@ -192,10 +192,11 @@ const FacultyDashboard: React.FC = () => {
                         <div className="space-y-3">
                             {[
                                 { label: 'Journal & Conference', icon: FileText, path: '/faculty/journals-conferences', color: 'text-blue-600', bg: 'bg-blue-600/10' },
+                                { label: 'Projects & Consultancy', icon: Lightbulb, path: '/faculty/projects-consultancy', color: 'text-cyan-600', bg: 'bg-cyan-600/10' },
                                 { label: 'Teaching Activity', icon: GraduationCap, path: '/faculty/teaching', color: 'text-violet-600', bg: 'bg-violet-600/10' },
                                 { label: 'Event & Contribution', icon: Compass, path: '/faculty/events-contributions', color: 'text-amber-600', bg: 'bg-amber-600/10' },
                                 { label: 'Books & Chapters', icon: Library, path: '/faculty/books-chapters', color: 'text-emerald-600', bg: 'bg-emerald-600/10' },
-                                { label: 'Patent & Guidance', icon: Lightbulb, path: '/faculty/patents-guidance', color: 'text-fuchsia-600', bg: 'bg-fuchsia-600/10' }
+                                { label: 'Patent & Guidance', icon: Zap, path: '/faculty/patents-guidance', color: 'text-fuchsia-600', bg: 'bg-fuchsia-600/10' }
                             ].map((item, idx) => (
                                 <Link key={idx} to={item.path} className="group flex items-center justify-between p-4 rounded-[22px] bg-white border border-slate-200/60 hover:border-primary/30 hover:shadow-xl transition-all duration-300">
                                     <div className="flex items-center gap-3">

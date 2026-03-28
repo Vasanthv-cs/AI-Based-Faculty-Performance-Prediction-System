@@ -145,29 +145,15 @@ const FacultyManagement: React.FC = () => {
     const name = staffToDelete.full_name;
 
     try {
-      // Step 1: Delete all related data from every table (cascade-safe order)
-      await supabase.from('research_activities').delete().eq('user_id', uid);
-      await supabase.from('teaching_learning_activities').delete().eq('user_id', uid);
-      await supabase.from('networking_contributions').delete().eq('user_id', uid);
-      await supabase.from('performance_scores').delete().eq('user_id', uid);
+      // Call the SQL function that deletes all data + removes from auth.users
+      // (Uses SECURITY DEFINER so it can delete from auth schema)
+      const { error } = await (supabase as any).rpc('admin_delete_user', { _user_id: uid });
 
-      // Step 2: Delete profile and role
-      await supabase.from('user_roles').delete().eq('user_id', uid);
-      const { error: profileError } = await supabase.from('profiles').delete().eq('user_id', uid);
-      if (profileError) throw profileError;
+      if (error) throw error;
 
-      // Step 3: Optimistically remove from UI immediately
+      // Remove from local UI immediately
       setStaff(prev => prev.filter(s => s.user_id !== uid));
-      toast.success(`${name} has been removed from directory`);
-
-      // Step 4: Try Edge Function to also remove from auth.users (best effort)
-      try {
-        await supabase.functions.invoke('delete-user-completely', { body: { user_id: uid } });
-      } catch {
-        // Auth user removal failed (Edge Function not deployed or network error)
-        // The profile/data is already deleted so they can't login or be found anymore
-        console.warn('Auth user removal skipped (Edge Function unavailable)');
-      }
+      toast.success(`${name} has been permanently removed`);
     } catch (error: any) {
       console.error('Delete faculty error:', error);
       toast.error(error.message || 'Delete operation failed. Please try again.');

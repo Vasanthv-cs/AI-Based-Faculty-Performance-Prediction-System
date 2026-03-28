@@ -197,10 +197,10 @@ const AnalyticsPage: React.FC = () => {
         })).sort((a, b) => b.score - a.score)
       );
 
-      const levelCounts: Record<string, number> = { Excellent: 0, 'Very Good': 0, Good: 0, Poor: 0 };
+      const levelCounts: Record<string, number> = { Excellent: 0, 'Very Good': 0, Good: 0, 'Needs Improvement': 0 };
       teaching.forEach(t => {
         const lvl = t.instruction_material_level || 'Good';
-        const key = lvl.includes('Excellent') ? 'Excellent' : lvl.includes('Very Good') ? 'Very Good' : lvl.includes('Good') ? 'Good' : 'Poor';
+        const key = lvl.includes('Excellent') ? 'Excellent' : lvl.includes('Very Good') ? 'Very Good' : lvl.includes('Good') ? 'Good' : 'Needs Improvement';
         if (levelCounts[key] !== undefined) levelCounts[key]++;
       });
       setTeachingLevelPie(

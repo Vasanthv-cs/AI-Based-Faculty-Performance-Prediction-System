@@ -65,6 +65,7 @@ const NetworkingContributions: React.FC = () => {
                 .from('networking_contributions')
                 .select('*')
                 .eq('user_id', user.id)
+                .not('contribution_category', 'in', '("Consultancy","Funded Project")')
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -230,8 +231,6 @@ const NetworkingContributions: React.FC = () => {
                                                     <SelectItem value="Professional Society" className="font-bold">Professional Society</SelectItem>
                                                     <SelectItem value="FDP Attended" className="font-bold">FDP Attended</SelectItem>
                                                     <SelectItem value="Organized Event" className="font-bold">Organized Event</SelectItem>
-                                                    <SelectItem value="Consultancy" className="font-bold">Consultancy</SelectItem>
-                                                    <SelectItem value="Funded Project" className="font-bold">Funded Project</SelectItem>
                                                     <SelectItem value="Institution Contribution" className="font-bold">Institution Contribution</SelectItem>
                                                 </SelectContent>
                                             </Select>
@@ -357,8 +356,6 @@ const NetworkingContributions: React.FC = () => {
                         'Professional Society': 20,
                         'FDP Attended': 25,
                         'Organized Event': 25,
-                        'Consultancy': 15,
-                        'Funded Project': 25,
                         'Institution Contribution': 30
                     };
 

@@ -67,30 +67,70 @@ function buildPrintHTML(data: FacultyReportData): string {
             </div>
         </div>`;
 
-    // ── Cap helpers ──────────────────────────────────────────────────────────────
-    const RESEARCH_MAX = 100;
-    const NETWORK_MAX  = 100;
+    // ── Image items 7-14 = Category II: Research (Journal, Conferences, Book Chapters, Books, Consultancy, Funded Projects, Patents, Guidance)
+    // Note: Consultancy and Funded Projects are stored in networking_contributions but score in Category II
+    const RESEARCH_CAPS: Record<string, number> = {
+        'Journal': 25, 'Conference': 10, 'Book Chapter': 10,
+        'Book': 5, 'Consultancy': 10, 'Funded Project': 25,
+        'Patent': 5, 'Guidance': 10
+    };
+    const RESEARCH_TOTAL_MAX = 100;
 
-    // Compute per-row metadata with running totals
-    let rRunning = 0;
-    const researchMeta = data.researchRecords.map((r: any) => {
-        const pts     = Number(r.score_claimed || 0);
-        const prev    = rRunning;
-        rRunning     += pts;
-        const counted = Math.max(0, Math.min(pts, RESEARCH_MAX - prev));
-        return { pts, counted, isExtra: counted < pts, isFullyExtra: counted === 0 };
+    // Combine research_activities + consultancy/funded_project from networking for Category II
+    const researchAndNetResearch = [
+        ...data.researchRecords.map((r: any) => ({ ...r, _cat: r.activity_category })),
+        ...data.networkingRecords
+            .filter((n: any) => n.contribution_category === 'Consultancy' || n.contribution_category === 'Funded Project')
+            .map((n: any) => ({ ...n, _cat: n.contribution_category })),
+    ];
+
+    const rCatTrack: Record<string, number> = {};
+    let rTotalCapped = 0;
+    const researchMeta = researchAndNetResearch.map((r: any) => {
+        const cat = r._cat || 'Other';
+        const pts = Number(r.score_claimed || 0);
+        const cap = RESEARCH_CAPS[cat] ?? 999;
+        const prevCat = rCatTrack[cat] || 0;
+        const allowedInCat = Math.max(0, Math.min(pts, cap - prevCat));
+        const counted = Math.max(0, Math.min(allowedInCat, RESEARCH_TOTAL_MAX - rTotalCapped));
+        rCatTrack[cat] = prevCat + pts;
+        rTotalCapped += counted;
+        const isSubCapExtra = allowedInCat < pts;
+        return { pts, counted, isExtra: counted < pts, isFullyExtra: counted === 0, isSubCapExtra };
     });
-    const liveResearchScore = Math.min(rRunning, RESEARCH_MAX);
+    const liveResearchScore = rTotalCapped;
+    const rRunning = researchAndNetResearch.reduce((s: number, r: any) => s + Number(r.score_claimed || 0), 0);
 
-    let nRunning = 0;
+    // ── Image items 15-18 = Category III: Networking (Prof Society, FDP, Organized Event, Institution)
+    // Consultancy and Funded Project are excluded here (counted in Category II)
+    const NETWORK_CAPS: Record<string, number> = {
+        'Professional Society': 20, 'FDP Attended': 25,
+        'Organized Event': 25, 'Institution Contribution': 30
+    };
+    const NETWORK_TOTAL_MAX = 100;
+
+    const nCatTrack: Record<string, number> = {};
+    let nTotalCapped = 0;
     const networkMeta = data.networkingRecords.map((n: any) => {
-        const pts     = Number(n.score_claimed || 0);
-        const prev    = nRunning;
-        nRunning     += pts;
-        const counted = Math.max(0, Math.min(pts, NETWORK_MAX - prev));
-        return { pts, counted, isExtra: counted < pts, isFullyExtra: counted === 0 };
+        const cat = n.contribution_category || 'Other';
+        // Skip Consultancy and Funded Project — they are counted in Category II
+        if (cat === 'Consultancy' || cat === 'Funded Project') {
+            return { pts: Number(n.score_claimed || 0), counted: 0, isExtra: true, isFullyExtra: true, isSubCapExtra: false, isResearchCat: true };
+        }
+        const pts = Number(n.score_claimed || 0);
+        const cap = NETWORK_CAPS[cat] ?? 999;
+        const prevCat = nCatTrack[cat] || 0;
+        const allowedInCat = Math.max(0, Math.min(pts, cap - prevCat));
+        const counted = Math.max(0, Math.min(allowedInCat, NETWORK_TOTAL_MAX - nTotalCapped));
+        nCatTrack[cat] = prevCat + pts;
+        nTotalCapped += counted;
+        const isSubCapExtra = allowedInCat < pts;
+        return { pts, counted, isExtra: counted < pts, isFullyExtra: counted === 0, isSubCapExtra, isResearchCat: false };
     });
-    const liveNetworkScore = Math.min(nRunning, NETWORK_MAX);
+    const liveNetworkScore = nTotalCapped;
+    const nRunning = data.networkingRecords
+        .filter((n: any) => n.contribution_category !== 'Consultancy' && n.contribution_category !== 'Funded Project')
+        .reduce((s: number, n: any) => s + Number(n.score_claimed || 0), 0);
 
     // Use live-computed scores so the bars match the actual item list
     const displayResearchScore      = liveResearchScore;
@@ -98,27 +138,39 @@ function buildPrintHTML(data: FacultyReportData): string {
     const displayTotal = data.teachingScore + displayResearchScore + displayContributionScore;
 
     // Row builders for Research / Networking with cap indicators
-    const researchRows = data.researchRecords.map((r: any, i: number) => {
+    // researchRows = items 7-14 from image (includes Consultancy & Funded Project)
+    const researchRows = researchAndNetResearch.map((r: any, i: number) => {
         const { pts, counted, isFullyExtra, isExtra } = researchMeta[i];
+        const category = r._src === 'networking' ? r.contribution_category : r.activity_category;
         const scoreCell = isFullyExtra
             ? `<span style="text-decoration:line-through;color:#94a3b8">${pts} pts</span> <span style="margin-left:4px;background:#fef3c7;border:1px solid #fcd34d;color:#b45309;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700;">EXTRA — Not Counted</span>`
             : isExtra
             ? `<span style="color:#059669;font-weight:600">${counted} pts</span> <span style="margin-left:4px;background:#fef3c7;border:1px solid #fcd34d;color:#b45309;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700;">${pts - counted} pts excess</span>`
             : `<span style="font-weight:600">${pts} pts</span>`;
         const rowBg = isFullyExtra ? 'background:#f8fafc;opacity:0.7;' : isExtra ? 'background:#fffbeb;' : '';
-        return `<tr style="${rowBg}"><td style="padding:5px 10px;border:1px solid #e2e8f0;${isFullyExtra ? 'color:#94a3b8;text-decoration:line-through;' : ''}">${r.title || '—'}</td><td style="padding:5px 10px;border:1px solid #e2e8f0;${isFullyExtra ? 'color:#94a3b8;' : ''}">${r.activity_category || '—'}</td><td style="padding:5px 10px;border:1px solid #e2e8f0;${isFullyExtra ? 'color:#94a3b8;' : ''}">${r.academic_year || '—'}</td><td style="padding:5px 10px;border:1px solid #e2e8f0;">${scoreCell}</td></tr>`;
+        return `<tr style="${rowBg}"><td style="padding:5px 10px;border:1px solid #e2e8f0;${isFullyExtra ? 'color:#94a3b8;text-decoration:line-through;' : ''}">${r.title || '—'}</td><td style="padding:5px 10px;border:1px solid #e2e8f0;${isFullyExtra ? 'color:#94a3b8;' : ''}">${category || '—'}</td><td style="padding:5px 10px;border:1px solid #e2e8f0;${isFullyExtra ? 'color:#94a3b8;' : ''}">${r.academic_year || '—'}</td><td style="padding:5px 10px;border:1px solid #e2e8f0;">${scoreCell}</td></tr>`;
     }).join('');
 
-    const networkRows = data.networkingRecords.map((n: any, i: number) => {
-        const { pts, counted, isFullyExtra, isExtra } = networkMeta[i];
-        const scoreCell = isFullyExtra
-            ? `<span style="text-decoration:line-through;color:#94a3b8">${pts} pts</span> <span style="margin-left:4px;background:#fef3c7;border:1px solid #fcd34d;color:#b45309;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700;">EXTRA — Not Counted</span>`
-            : isExtra
-            ? `<span style="color:#059669;font-weight:600">${counted} pts</span> <span style="margin-left:4px;background:#fef3c7;border:1px solid #fcd34d;color:#b45309;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700;">${pts - counted} pts excess</span>`
-            : `<span style="font-weight:600">${pts} pts</span>`;
-        const rowBg = isFullyExtra ? 'background:#f8fafc;opacity:0.7;' : isExtra ? 'background:#fffbeb;' : '';
-        return `<tr style="${rowBg}"><td style="padding:5px 10px;border:1px solid #e2e8f0;${isFullyExtra ? 'color:#94a3b8;text-decoration:line-through;' : ''}">${n.title || '—'}</td><td style="padding:5px 10px;border:1px solid #e2e8f0;${isFullyExtra ? 'color:#94a3b8;' : ''}">${n.contribution_category || '—'}</td><td style="padding:5px 10px;border:1px solid #e2e8f0;${isFullyExtra ? 'color:#94a3b8;' : ''}">${n.academic_year || '—'}</td><td style="padding:5px 10px;border:1px solid #e2e8f0;">${scoreCell}</td></tr>`;
-    }).join('');
+    // networkRows = items 15-18 from image ONLY (Consultancy & Funded Project excluded — they appear in Research)
+    const networkRows = data.networkingRecords
+        .filter((n: any) => n.contribution_category !== 'Consultancy' && n.contribution_category !== 'Funded Project')
+        .map((n: any, i: number) => {
+            // Find the correct meta index (skip the Consultancy/Funded entries filtered out)
+            const allIdx = data.networkingRecords.findIndex((_: any, fi: number) =>
+                data.networkingRecords.slice(0, fi + 1).filter((x: any) =>
+                    x.contribution_category !== 'Consultancy' && x.contribution_category !== 'Funded Project'
+                ).length === i + 1
+            );
+            const meta = networkMeta[allIdx] || { pts: 0, counted: 0, isFullyExtra: false, isExtra: false };
+            const { pts, counted, isFullyExtra, isExtra } = meta;
+            const scoreCell = isFullyExtra
+                ? `<span style="text-decoration:line-through;color:#94a3b8">${pts} pts</span> <span style="margin-left:4px;background:#fef3c7;border:1px solid #fcd34d;color:#b45309;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700;">EXTRA — Not Counted</span>`
+                : isExtra
+                ? `<span style="color:#059669;font-weight:600">${counted} pts</span> <span style="margin-left:4px;background:#fef3c7;border:1px solid #fcd34d;color:#b45309;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700;">${pts - counted} pts excess</span>`
+                : `<span style="font-weight:600">${pts} pts</span>`;
+            const rowBg = isFullyExtra ? 'background:#f8fafc;opacity:0.7;' : isExtra ? 'background:#fffbeb;' : '';
+            return `<tr style="${rowBg}"><td style="padding:5px 10px;border:1px solid #e2e8f0;${isFullyExtra ? 'color:#94a3b8;text-decoration:line-through;' : ''}">${n.title || '—'}</td><td style="padding:5px 10px;border:1px solid #e2e8f0;${isFullyExtra ? 'color:#94a3b8;' : ''}">${n.contribution_category || '—'}</td><td style="padding:5px 10px;border:1px solid #e2e8f0;${isFullyExtra ? 'color:#94a3b8;' : ''}">${n.academic_year || '—'}</td><td style="padding:5px 10px;border:1px solid #e2e8f0;">${scoreCell}</td></tr>`;
+        }).join('');
 
     return `<!DOCTYPE html>
 <html>
@@ -196,7 +248,7 @@ function buildPrintHTML(data: FacultyReportData): string {
     <!-- Research Records -->
     <div class="section">
         <div class="section-title">Research Activities (Max 100 pts — Counted: ${displayResearchScore} pts)</div>
-        ${rRunning > RESEARCH_MAX ? `<p class="cap-note">⚠ Total claimed: ${rRunning} pts. Only the first ${RESEARCH_MAX} pts are counted. Rows marked "EXTRA" are excluded from scoring.</p>` : ''}
+        ${rRunning > RESEARCH_TOTAL_MAX ? `<p class="cap-note">⚠ Total claimed: ${rRunning} pts. Only the first ${RESEARCH_TOTAL_MAX} pts are counted. Rows marked "EXTRA" are excluded from scoring.</p>` : ''}
         ${data.researchRecords.length === 0
             ? '<p class="no-data">No research records found.</p>'
             : `<table>
@@ -208,7 +260,7 @@ function buildPrintHTML(data: FacultyReportData): string {
     <!-- Networking & Contributions -->
     <div class="section">
         <div class="section-title">Networking &amp; Contributions (Max 100 pts — Counted: ${displayContributionScore} pts)</div>
-        ${nRunning > NETWORK_MAX ? `<p class="cap-note">⚠ Total claimed: ${nRunning} pts. Only the first ${NETWORK_MAX} pts are counted. Rows marked "EXTRA" are excluded from scoring.</p>` : ''}
+        ${nRunning > NETWORK_TOTAL_MAX ? `<p class="cap-note">⚠ Total claimed: ${nRunning} pts. Only the first ${NETWORK_TOTAL_MAX} pts are counted. Rows marked "EXTRA" are excluded from scoring.</p>` : ''}
         ${data.networkingRecords.length === 0
             ? '<p class="no-data">No contribution records found.</p>'
             : `<table>
