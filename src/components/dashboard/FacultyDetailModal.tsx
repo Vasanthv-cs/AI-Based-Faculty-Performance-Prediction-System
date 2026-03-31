@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import UserAvatar from '@/components/common/UserAvatar';
+import FileViewer from '@/components/FileViewer';
 
 interface FacultyDetailModalProps {
   facultyId: string | null;
@@ -460,6 +461,11 @@ const FacultyDetailModal: React.FC<FacultyDetailModalProps> = ({
                             ) : (
                               <Badge variant="outline">+{r.score_claimed} Pts</Badge>
                             )}
+                            {r.proof_url && (
+                              <div className="mt-1 flex justify-end w-full">
+                                <FileViewer url={r.proof_url} />
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
@@ -534,6 +540,11 @@ const FacultyDetailModal: React.FC<FacultyDetailModalProps> = ({
                               </>
                             ) : (
                               <Badge variant="outline">+{c.score_claimed} Pts</Badge>
+                            )}
+                            {c.proof_url && (
+                              <div className="mt-1 flex justify-end w-full">
+                                <FileViewer url={c.proof_url} />
+                              </div>
                             )}
                           </div>
                         </div>

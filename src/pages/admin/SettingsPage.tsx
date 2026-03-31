@@ -1,4 +1,4 @@
- import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
  import DashboardLayout from '@/components/layout/DashboardLayout';
  import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
  import { Button } from '@/components/ui/button';
@@ -23,7 +23,7 @@
  } from '@/components/ui/alert-dialog';
  import { supabase } from '@/integrations/supabase/client';
  import { useToast } from '@/hooks/use-toast';
- import { Search, Users, ShieldPlus, ShieldMinus, UserCog, Eye } from 'lucide-react';
+import { Search, Users, ShieldPlus, ShieldMinus, UserCog, Eye, Info } from 'lucide-react';
  import { Badge } from '@/components/ui/badge';
  import FacultyDetailModal from '@/components/dashboard/FacultyDetailModal';
  
@@ -127,70 +127,57 @@
    };
  
    const handleAddAdminConfirm = async () => {
-     if (!selectedUser) return;
- 
-     setIsProcessing(true);
-     try {
-       // Upsert so it works even if user_roles row doesn't exist yet
-       const { error } = await supabase
-         .from('user_roles')
-         .upsert({ user_id: selectedUser.user_id, role: 'admin' }, { onConflict: 'user_id' });
- 
-       if (error) throw error;
- 
-       toast({
-         title: 'Success',
-         description: `${selectedUser.full_name} is now an Admin.`,
-       });
- 
-       fetchData();
-     } catch (error) {
-       console.error('Error adding admin:', error);
-       toast({
-         title: 'Error',
-         description: 'Failed to add admin role',
-         variant: 'destructive',
-       });
-     } finally {
-       setIsProcessing(false);
-       setAddAdminDialogOpen(false);
-       setSelectedUser(null);
-     }
-   };
- 
-   const handleRemoveAdminConfirm = async () => {
-     if (!selectedUser) return;
- 
-     setIsProcessing(true);
-     try {
-       // Update the user's role back to faculty
-       const { error } = await supabase
-         .from('user_roles')
-         .update({ role: 'faculty' })
-         .eq('user_id', selectedUser.user_id);
- 
-       if (error) throw error;
- 
-       toast({
-         title: 'Success',
-         description: `${selectedUser.full_name} is no longer an Admin.`,
-       });
- 
-       // Refresh data
-       fetchData();
-     } catch (error) {
-       console.error('Error removing admin:', error);
-       toast({
-         title: 'Error',
-         description: 'Failed to remove admin role',
-         variant: 'destructive',
-       });
-     } finally {
-       setIsProcessing(false);
-       setRemoveAdminDialogOpen(false);
-       setSelectedUser(null);
-     }
-   };
+    if (!selectedUser) return;
+    setIsProcessing(true);
+    try {
+      // Use RPC function which correctly deletes old role and inserts new one
+      // (needed because user_roles has UNIQUE(user_id, role) — not UNIQUE(user_id))
+      const { error } = await (supabase as any).rpc('set_user_role', {
+        _user_id: selectedUser.user_id,
+        _new_role: 'admin',
+      });
+      if (error) throw error;
+      toast({ title: 'Success', description: `${selectedUser.full_name} is now an Admin.` });
+      fetchData();
+    } catch (error: any) {
+      console.error('Error adding admin:', error);
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to add admin role',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsProcessing(false);
+      setAddAdminDialogOpen(false);
+      setSelectedUser(null);
+    }
+  };
+
+  const handleRemoveAdminConfirm = async () => {
+    if (!selectedUser) return;
+    setIsProcessing(true);
+    try {
+      // Use RPC function to correctly switch role back to faculty
+      const { error } = await (supabase as any).rpc('set_user_role', {
+        _user_id: selectedUser.user_id,
+        _new_role: 'faculty',
+      });
+      if (error) throw error;
+      toast({ title: 'Success', description: `${selectedUser.full_name} is no longer an Admin.` });
+      fetchData();
+    } catch (error: any) {
+      console.error('Error removing admin:', error);
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to remove admin role',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsProcessing(false);
+      setRemoveAdminDialogOpen(false);
+      setSelectedUser(null);
+    }
+  };
  
    const handleViewDetails = (userId: string) => {
      setSelectedFacultyId(userId);
@@ -210,14 +197,15 @@
    };
  
    // Stats calculations
-   const totalFaculty = staff.filter(s => s.role === 'faculty').length;
-   const totalAdmins = staff.filter(s => s.role === 'admin').length;
-   const totalStaff = staff.length;
- 
-   // Get non-admin staff for "Add Admin" list
-   const nonAdminStaff = filteredStaff.filter(s => s.role !== 'admin');
-   // Get current admins for "Remove Admin" list
-   const adminStaff = filteredStaff.filter(s => s.role === 'admin');
+  const totalFaculty = staff.filter(s => s.role === 'faculty').length;
+  const totalAdmins = staff.filter(s => s.role === 'admin').length;
+  const totalStaff = staff.length;
+  const isLastAdmin = totalAdmins <= 1;
+
+  // Get non-admin staff for "Add Admin" list
+  const nonAdminStaff = filteredStaff.filter(s => s.role !== 'admin');
+  // Get current admins for "Remove Admin" list
+  const adminStaff = filteredStaff.filter(s => s.role === 'admin');
  
    return (
      <DashboardLayout>
@@ -425,24 +413,34 @@
                              <Badge variant="destructive">ADMIN</Badge>
                            </TableCell>
                            <TableCell className="text-right">
-                             <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                               <Button
-                                 variant="ghost"
-                                 size="sm"
-                                 onClick={() => handleViewDetails(member.user_id)}
-                               >
-                                 <Eye className="w-4 h-4" />
-                               </Button>
-                               <Button
-                                 variant="outline"
-                                 size="sm"
-                                 className="text-destructive border-destructive hover:bg-destructive/10"
-                                 onClick={() => handleRemoveAdminClick(member)}
-                               >
-                                 <ShieldMinus className="w-4 h-4" />
-                               </Button>
-                             </div>
-                           </TableCell>
+                            <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleViewDetails(member.user_id)}
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              {isLastAdmin ? (
+                                <div
+                                  className="flex items-center gap-1 text-xs text-muted-foreground italic px-2 py-1 rounded-md bg-muted/50 border border-dashed border-muted-foreground/30"
+                                  title="Add another admin before removing this one"
+                                >
+                                  <Info className="w-3.5 h-3.5 shrink-0" />
+                                  Add another admin
+                                </div>
+                              ) : (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-destructive border-destructive hover:bg-destructive/10"
+                                  onClick={() => handleRemoveAdminClick(member)}
+                                >
+                                  <ShieldMinus className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
                          </TableRow>
                        ))
                      )}
