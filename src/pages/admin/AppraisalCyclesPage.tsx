@@ -83,7 +83,7 @@ const AppraisalCyclesPage: React.FC = () => {
     const fetchCycles = async () => {
         setIsLoading(true);
         try {
-            const { data, error } = await supabase
+            const { data, error } = await (supabase as any)
                 .from('appraisal_cycles')
                 .select('*')
                 .order('created_at', { ascending: false });
@@ -122,14 +122,36 @@ const AppraisalCyclesPage: React.FC = () => {
     };
 
     // ── Toggle open/close ────────────────────────────────────────────────────
+    // Rule: only ONE cycle can be open at a time.
+    // If re-opening a closed cycle → first close every other open cycle.
     const handleToggle = async (cycle: AppraisalCycle) => {
         try {
-            const { error } = await supabase
-                .from('appraisal_cycles')
-                .update({ is_open: !cycle.is_open })
-                .eq('id', cycle.id);
-            if (error) throw error;
-            toast.success(`Cycle ${!cycle.is_open ? 'opened' : 'closed'}`);
+            if (!cycle.is_open) {
+                // We are OPENING this cycle → close all others first
+                const openCycles = cycles.filter(c => c.is_open && c.id !== cycle.id);
+                for (const openCycle of openCycles) {
+                    const { error } = await (supabase as any)
+                        .from('appraisal_cycles')
+                        .update({ is_open: false })
+                        .eq('id', openCycle.id);
+                    if (error) throw error;
+                }
+                // Now open this cycle
+                const { error } = await (supabase as any)
+                    .from('appraisal_cycles')
+                    .update({ is_open: true })
+                    .eq('id', cycle.id);
+                if (error) throw error;
+                toast.success(`Cycle reopened. Any previously open cycle has been closed.`);
+            } else {
+                // We are CLOSING this cycle
+                const { error } = await (supabase as any)
+                    .from('appraisal_cycles')
+                    .update({ is_open: false })
+                    .eq('id', cycle.id);
+                if (error) throw error;
+                toast.success('Cycle closed. You can now launch a new phase.');
+            }
             fetchCycles();
         } catch (err: any) {
             toast.error(err.message || 'Status toggle failed');
@@ -248,14 +270,38 @@ const AppraisalCyclesPage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Launch New Phase */}
+{/* Launch New Phase — only allowed when NO cycle is currently open */}
+                {(() => {
+                    const hasOpenCycle = cycles.some(c => c.is_open);
+                    return (
+                        <div className="flex flex-col items-end gap-2">
+                            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                                <DialogTrigger asChild>
+                                    <Button
+                                        disabled={hasOpenCycle}
+                                        className={`h-14 px-10 rounded-3xl font-black text-lg transition-all duration-500 group ${
+                                            hasOpenCycle
+                                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                                                : 'bg-slate-900 text-white hover:bg-slate-800 shadow-2xl shadow-slate-900/20 hover:-translate-y-1'
+                                        }`}
+                                    >
+                                        <Plus className="w-6 h-6 mr-3 group-hover:rotate-180 transition-transform duration-500" />
+                                        Launch New Phase
+                                    </Button>
+                                </DialogTrigger>
+                                {hasOpenCycle && (
+                                    <p className="text-xs font-black text-amber-600 uppercase tracking-widest flex items-center gap-1.5">
+                                        <Lock className="w-3.5 h-3.5" />
+                                        Close the active cycle first to create a new one
+                                    </p>
+                                )}
+                            </Dialog>
+                        </div>
+                    );
+                })()}
+
+                {/* Hidden dialog content — rendered separately to avoid nesting issue */}
                 <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button className="h-14 px-10 rounded-3xl bg-slate-900 text-white hover:bg-slate-800 shadow-2xl shadow-slate-900/20 font-black text-lg transition-all duration-500 hover:-translate-y-1 group">
-                            <Plus className="w-6 h-6 mr-3 group-hover:rotate-180 transition-transform duration-500" />
-                            Launch New Phase
-                        </Button>
-                    </DialogTrigger>
                     <DialogContent className="sm:max-w-2xl rounded-[40px] border-none shadow-2xl p-0 overflow-hidden bg-background/95 backdrop-blur-2xl">
                         <div className="bg-gradient-to-br from-slate-900 to-indigo-900 px-10 py-12 text-white relative">
                             <div className="absolute top-0 right-0 p-10 opacity-10 rotate-12 scale-150">
