@@ -12,8 +12,8 @@ import { toast } from 'sonner';
 import { Plus, Users, Pencil, Trash2, Loader2, FileDown, Eye, Sparkles, CheckCircle2, Lock, ShieldCheck, Zap, Library, Award, MapPin, ExternalLink, Activity } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import FileUpload from '@/components/FileUpload';
+import OCRAutoFill from '@/components/OCRAutoFill';
 import { useFileUpload } from '@/hooks/useFileUpload';
-import { useOCR } from '@/hooks/useOCR';
 import { useActiveCycle } from '@/hooks/useActiveCycle';
 import CycleLockBanner from '@/components/dashboard/CycleLockBanner';
 import FileViewer from '@/components/FileViewer';
@@ -27,8 +27,6 @@ const MembershipsFDP: React.FC = () => {
     const [editingItem, setEditingItem] = useState<any | null>(null);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const { upload, isUploading, progress } = useFileUpload({ folder: 'networking' });
-    const { extractFromFile, isProcessing: isOCRProcessing, ocrResult, clearResult } = useOCR();
-    const [showOCRSuggestion, setShowOCRSuggestion] = useState(false);
     const { isOpen, cycleName, isLoading: isCycleLoading } = useActiveCycle();
 
     const currentYear = new Date().getFullYear();
@@ -98,8 +96,6 @@ const MembershipsFDP: React.FC = () => {
         });
         setSelectedFile(null);
         setEditingItem(null);
-        clearResult();
-        setShowOCRSuggestion(false);
     };
 
     const handleOpenDialog = (item?: any) => {
@@ -124,23 +120,6 @@ const MembershipsFDP: React.FC = () => {
         setIsDialogOpen(true);
     };
 
-    const handleFileSelect = async (file: File) => {
-        setSelectedFile(file);
-        if (file.type.includes('image')) {
-            const result = await extractFromFile(file);
-            if (result && result.text.length > 20) setShowOCRSuggestion(true);
-        }
-    };
-
-    const applyOCR = () => {
-        if (!ocrResult) return;
-        setFormData({
-            ...formData,
-            title: ocrResult.suggestedTitle || formData.title
-        });
-        toast.info('Info partially filled from document');
-        setShowOCRSuggestion(false);
-    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -345,31 +324,20 @@ const MembershipsFDP: React.FC = () => {
                                             <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                                              Attached Evidence (Certificates / Membership Cards)
                                         </h3>
-                                        <FileUpload onFileSelect={handleFileSelect} onRemove={() => setSelectedFile(null)} isUploading={isUploading} progress={progress} currentFileUrl={editingItem?.proof_url} />
-                                        
-                                        {isOCRProcessing && (
-                                            <div className="flex items-center gap-3 p-4 rounded-2xl bg-indigo-50 border border-indigo-100 animate-pulse">
-                                                <Loader2 className="w-5 h-5 text-indigo-500 animate-spin" />
-                                                <span className="text-xs font-black uppercase tracking-widest text-indigo-600">Analyzing Document...</span>
-                                            </div>
-                                        )}
-                                        
-                                        {showOCRSuggestion && (
-                                            <div className="p-6 rounded-3xl bg-amber-50 border-2 border-amber-200 shadow-xl shadow-amber-500/10 animate-reveal">
-                                                <div className="flex items-start gap-4 mb-4">
-                                                    <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center">
-                                                        <Zap className="w-5 h-5" />
-                                                    </div>
-                                                    <div>
-                                                        <h4 className="font-black text-amber-900 leading-none mb-1">OCR Analysis Ready</h4>
-                                                        <p className="text-xs font-medium text-amber-700 opacity-70">Identified potential title from provided proof.</p>
-                                                    </div>
-                                                </div>
-                                                <Button type="button" onClick={applyOCR} className="w-full h-12 rounded-xl bg-amber-500 text-white font-black hover:bg-amber-600 shadow-lg shadow-amber-500/20">
-                                                    Apply Found Info
-                                                </Button>
-                                            </div>
-                                        )}
+                                        <FileUpload onFileSelect={setSelectedFile} onRemove={() => setSelectedFile(null)} isUploading={isUploading} progress={progress} currentFileUrl={editingItem?.proof_url} />
+                                        <OCRAutoFill
+                                            file={selectedFile}
+                                            docType="fdp"
+                                            accentColor="violet"
+                                            onFieldsExtracted={(fields) => {
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    title: fields.title || prev.title,
+                                                    host: fields.organization || prev.host,
+                                                    year: fields.year || prev.year,
+                                                }));
+                                            }}
+                                        />
                                     </div>
 
                                     <div className="flex justify-end gap-3 pt-10 border-t border-border mt-10">

@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Plus, BookText, Pencil, Trash2, Loader2, ExternalLink, Lock } from 'lucide-react';
 import FileUpload from '@/components/FileUpload';
+import OCRAutoFill from '@/components/OCRAutoFill';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { useActiveCycle } from '@/hooks/useActiveCycle';
 import CycleLockBanner from '@/components/dashboard/CycleLockBanner';
@@ -218,6 +219,21 @@ const Books: React.FC = () => {
                             <div className="space-y-2 pt-2">
                                 <Label>Upload Book Cover / PDF</Label>
                                 <FileUpload onFileSelect={setSelectedFile} onRemove={() => setSelectedFile(null)} isUploading={isUploading} progress={progress} currentFileUrl={editingItem?.proof_url} />
+                                <OCRAutoFill
+                                    file={selectedFile}
+                                    docType="book"
+                                    accentColor="violet"
+                                    onFieldsExtracted={(fields) => {
+                                        setFormData(prev => ({
+                                            ...prev,
+                                            title: fields.title || prev.title,
+                                            authors: fields.authors || prev.authors,
+                                            publisher: fields.publisher || prev.publisher,
+                                            isbn: fields.isbn || prev.isbn,
+                                            year: fields.year || prev.year,
+                                        }));
+                                    }}
+                                />
                             </div>
 
                             <div className="flex justify-end gap-3 pt-4 border-t border-border mt-6">

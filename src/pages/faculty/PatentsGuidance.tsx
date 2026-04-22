@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import FileUpload from '@/components/FileUpload';
+import OCRAutoFill from '@/components/OCRAutoFill';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { useActiveCycle } from '@/hooks/useActiveCycle';
 import CycleLockBanner from '@/components/dashboard/CycleLockBanner';
@@ -254,6 +255,20 @@ const PatentsGuidance: React.FC = () => {
                                              Attached Evidence (Certificates / Order copies)
                                         </h3>
                                         <FileUpload onFileSelect={setSelectedFile} onRemove={() => setSelectedFile(null)} isUploading={isUploading} progress={progress} currentFileUrl={editingItem?.proof_url} />
+                                        <OCRAutoFill
+                                            file={selectedFile}
+                                            docType="patent"
+                                            accentColor="fuchsia"
+                                            onFieldsExtracted={(fields) => {
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    title: fields.title || prev.title,
+                                                    name: fields.patent_number || prev.name,
+                                                    status: fields.status || prev.status,
+                                                    year: fields.year || prev.year,
+                                                }));
+                                            }}
+                                        />
                                     </div>
 
                                     <div className="flex justify-end gap-3 pt-10 border-t border-border mt-10">

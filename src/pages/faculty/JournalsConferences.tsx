@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import FileUpload from '@/components/FileUpload';
+import OCRAutoFill from '@/components/OCRAutoFill';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { useActiveCycle } from '@/hooks/useActiveCycle';
 import CycleLockBanner from '@/components/dashboard/CycleLockBanner';
@@ -326,8 +327,28 @@ const JournalsConferences: React.FC = () => {
                                         </div>
                                     </div>
                                     <div className="space-y-2 pt-4 border-t border-border/50">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Attached Evidence (PDF)</Label>
+                                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Attached Evidence (PDF / Image)</Label>
                                         <FileUpload onFileSelect={setSelectedFile} onRemove={() => setSelectedFile(null)} isUploading={isUploading} progress={progress} currentFileUrl={editingItem?.proof_url} />
+                                        <OCRAutoFill
+                                            file={selectedFile}
+                                            docType={formData.type === 'Conference' ? 'conference' : 'journal'}
+                                            accentColor="blue"
+                                            onFieldsExtracted={(fields) => {
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    title: fields.title || prev.title,
+                                                    authors: fields.authors || prev.authors,
+                                                    venue_name: fields.journal_name || fields.conference_name || prev.venue_name,
+                                                    publisher: fields.publisher || prev.publisher,
+                                                    volume: fields.volume || prev.volume,
+                                                    issue: fields.issue || prev.issue,
+                                                    pages: fields.pages || prev.pages,
+                                                    issn: fields.issn || prev.issn,
+                                                    link: fields.doi ? `https://doi.org/${fields.doi}` : prev.link,
+                                                    year: fields.year || prev.year,
+                                                }));
+                                            }}
+                                        />
                                     </div>
 
                                     <div className="flex justify-end gap-3 pt-8 border-t border-border mt-8">

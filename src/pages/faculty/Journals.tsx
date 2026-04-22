@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Plus, BookOpen, Pencil, Trash2, Loader2, Link as LinkIcon, ExternalLink, Lock, FileText, Award, Globe, ShieldCheck, Microscope, Layers, CheckCircle2 } from 'lucide-react';
 import FileUpload from '@/components/FileUpload';
+import OCRAutoFill from '@/components/OCRAutoFill';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { useActiveCycle } from '@/hooks/useActiveCycle';
 import CycleLockBanner from '@/components/dashboard/CycleLockBanner';
@@ -297,9 +298,29 @@ const Journals: React.FC = () => {
                                     <div className="space-y-4 pt-6 border-t border-border/40">
                                         <h3 className="text-sm font-black uppercase tracking-[0.2em] text-slate-800 flex items-center gap-2 mb-4">
                                             <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                                             Verification Document (PDF)
+                                             Verification Document (PDF / Image)
                                         </h3>
                                         <FileUpload onFileSelect={setSelectedFile} onRemove={() => setSelectedFile(null)} isUploading={isUploading} progress={progress} currentFileUrl={editingItem?.proof_url} />
+                                        <OCRAutoFill
+                                            file={selectedFile}
+                                            docType="journal"
+                                            accentColor="blue"
+                                            onFieldsExtracted={(fields) => {
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    title: fields.title || prev.title,
+                                                    authors: fields.authors || prev.authors,
+                                                    journal_name: fields.journal_name || prev.journal_name,
+                                                    publisher: fields.publisher || prev.publisher,
+                                                    volume: fields.volume || prev.volume,
+                                                    issue: fields.issue || prev.issue,
+                                                    pages: fields.pages || prev.pages,
+                                                    issn: fields.issn || prev.issn,
+                                                    doi: fields.doi || prev.doi,
+                                                    year: fields.year || prev.year,
+                                                }));
+                                            }}
+                                        />
                                     </div>
 
                                     <div className="flex justify-end gap-3 pt-10 border-t border-border mt-10">
